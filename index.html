@@ -58,7 +58,6 @@
         .bar {
             flex: 1;
             max-width: 55px;
-            background: #67e8f9;
             color: #101020;
             border-radius: 6px 6px 0 0;
             font-size: 12px;
@@ -84,14 +83,16 @@
 <body>
     <h1>NetPulse</h1>
     <p>Your network diagnostics dashboard.</p>
+    <p>Check your Mac: 127.0.0.1 | Check your router: 192.168.1.1</p>
 
-    <input id="ipAddress" type="text" value="127.0.0.1"
+    <input id="ipAddress" type="text" value="192.168.1.1"
            aria-label="IP address">
     <button id="checkButton" onclick="runCheck()">Run Check</button>
     <p id="status" role="status">Status: Ready</p>
 
     <h2>Check Duration</h2>
     <p>Total check time in milliseconds. Latest check on the right.</p>
+    <p>Cyan: ping reply | Orange: no reply or timeout</p>
     <div id="chart" aria-label="Last 10 check durations">
         Run a check to start the chart.
     </div>
@@ -100,71 +101,95 @@
     <ul id="history"></ul>
 
     <script>
-        const durations = [];
+        const checks = [];
 
         function drawChart() {
             const chart = document.getElementById("chart");
             chart.textContent = "";
 
-            const maximum = Math.max(...durations, 1);
+            const maximum = Math.max(
+                ...checks.map(function(check) {
+                    return check.duration;
+                }),
+                1
+            );
 
-            durations.forEach(function(duration) {
+            checks.forEach(function(check) {
                 const bar = document.createElement("div");
                 bar.className = "bar";
-                bar.style.height = Math.max(30, duration / maximum * 180) + "px";
-                bar.textContent = duration;
-                bar.title = duration + " ms";
+                bar.style.height =
+                    Math.max(30, check.duration / maximum * 180) + "px";
+                bar.style.background =
+                    check.reachable ? "#67e8f9" : "#fbbf24";
+                bar.textContent = check.duration;
+                bar.title = check.ip + " — " + check.duration + " ms";
                 chart.appendChild(bar);
             });
         }
 
         async function runCheck() {
-            const ipAddress = document.getElementById("ipAddress").value.trim();
+            const ipAddress =
+                document.getElementById("ipAddress").value.trim();
             const status = document.getElementById("status");
             const button = document.getElementById("checkButton");
+            const allowedIPs = ["127.0.0.1", "192.168.1.1"];
 
-            if (ipAddress !== "127.0.0.1") {
-                status.textContent = "Status: Enter 127.0.0.1 for this first test.";
+            if (!allowedIPs.includes(ipAddress)) {
+                status.textContent =
+                    "Status: Enter 127.0.0.1 or 192.168.1.1.";
                 return;
             }
 
             button.disabled = true;
-            status.textContent = "Status: Checking...";
+            status.textContent = "Status: Checking " + ipAddress + "...";
 
             try {
                 const startTime = performance.now();
-                const response = await fetch("/check", { cache: "no-store" });
-
-                if (!response.ok) {
-                    throw new Error("Check failed");
-                }
+                const response = await fetch(
+                    "/check?ip=" + encodeURIComponent(ipAddress),
+                    { cache: "no-store" }
+                );
 
                 const result = await response.json();
-                const duration = Math.round(performance.now() - startTime);
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Check failed.");
+                }
+
+                const duration =
+                    Math.round(performance.now() - startTime);
                 const time = new Date().toLocaleTimeString();
                 let message;
 
                 if (result.reachable) {
-                    message = result.ip + " is reachable! Check took " + duration + " ms.";
+                    message = result.ip + " replied to ping.";
+                } else if (result.outcome === "timeout") {
+                    message = result.ip + " check timed out after 5 seconds.";
                 } else {
-                    message = result.ip + " gave no ping reply. Check took " + duration + " ms.";
+                    message = result.ip + " gave no ping reply.";
                 }
 
+                message += " Check took " + duration + " ms.";
                 status.textContent = "Status: " + message;
 
                 const entry = document.createElement("li");
                 entry.textContent = time + " — " + message;
                 document.getElementById("history").prepend(entry);
 
-                durations.push(duration);
+                checks.push({
+                    ip: result.ip,
+                    duration: duration,
+                    reachable: result.reachable
+                });
 
-                if (durations.length > 10) {
-                    durations.shift();
+                if (checks.length > 10) {
+                    checks.shift();
                 }
 
                 drawChart();
             } catch (error) {
-                status.textContent = "Status: Could not complete the check. Make sure the Python server is running.";
+                status.textContent =
+                    "Status: Check failed. " + error.message;
             } finally {
                 button.disabled = false;
             }
