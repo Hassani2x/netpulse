@@ -2,6 +2,8 @@
 
 A local network diagnostics dashboard built with Python, HTML, CSS, and JavaScript.
 
+
+
 ## Features
 
 - Sends one ping to 127.0.0.1 per check
