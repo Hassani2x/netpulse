@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NetPulse</title>
+
+    <style>
+        body {
+            background: #101020;
+            color: #eeeeff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            color: #67e8f9;
+            font-size: 56px;
+        }
+
+        input {
+            padding: 14px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background: #67e8f9;
+            color: #101020;
+            border: none;
+            padding: 14px 28px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        #chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 8px;
+            height: 200px;
+            max-width: 650px;
+            margin: 25px auto;
+            padding: 15px;
+            background: #1b1b32;
+            border-radius: 12px;
+        }
+
+        .bar {
+            flex: 1;
+            max-width: 55px;
+            background: #67e8f9;
+            color: #101020;
+            border-radius: 6px 6px 0 0;
+            font-size: 12px;
+            font-weight: bold;
+            padding-top: 8px;
+            box-sizing: border-box;
+        }
+
+        #history {
+            list-style: none;
+            padding: 0;
+        }
+
+        #history li {
+            margin: 10px auto;
+            padding: 12px;
+            background: #1b1b32;
+            border-radius: 8px;
+            max-width: 650px;
+        }
+    </style>
+</head>
+<body>
+    <h1>NetPulse</h1>
+    <p>Your network diagnostics dashboard.</p>
+
+    <input id="ipAddress" type="text" value="127.0.0.1"
+           aria-label="IP address">
+    <button id="checkButton" onclick="runCheck()">Run Check</button>
+    <p id="status" role="status">Status: Ready</p>
+
+    <h2>Check Duration</h2>
+    <p>Total check time in milliseconds. Latest check on the right.</p>
+    <div id="chart" aria-label="Last 10 check durations">
+        Run a check to start the chart.
+    </div>
+
+    <h2>Check History</h2>
+    <ul id="history"></ul>
+
+    <script>
+        const durations = [];
+
+        function drawChart() {
+            const chart = document.getElementById("chart");
+            chart.textContent = "";
+
+            const maximum = Math.max(...durations, 1);
+
+            durations.forEach(function(duration) {
+                const bar = document.createElement("div");
+                bar.className = "bar";
+                bar.style.height = Math.max(30, duration / maximum * 180) + "px";
+                bar.textContent = duration;
+                bar.title = duration + " ms";
+                chart.appendChild(bar);
+            });
+        }
+
+        async function runCheck() {
+            const ipAddress = document.getElementById("ipAddress").value.trim();
+            const status = document.getElementById("status");
+            const button = document.getElementById("checkButton");
+
+            if (ipAddress !== "127.0.0.1") {
+                status.textContent = "Status: Enter 127.0.0.1 for this first test.";
+                return;
+            }
+
+            button.disabled = true;
+            status.textContent = "Status: Checking...";
+
+            try {
+                const startTime = performance.now();
+                const response = await fetch("/check", { cache: "no-store" });
+
+                if (!response.ok) {
+                    throw new Error("Check failed");
+                }
+
+                const result = await response.json();
+                const duration = Math.round(performance.now() - startTime);
+                const time = new Date().toLocaleTimeString();
+                let message;
+
+                if (result.reachable) {
+                    message = result.ip + " is reachable! Check took " + duration + " ms.";
+                } else {
+                    message = result.ip + " gave no ping reply. Check took " + duration + " ms.";
+                }
+
+                status.textContent = "Status: " + message;
+
+                const entry = document.createElement("li");
+                entry.textContent = time + " — " + message;
+                document.getElementById("history").prepend(entry);
+
+                durations.push(duration);
+
+                if (durations.length > 10) {
+                    durations.shift();
+                }
+
+                drawChart();
+            } catch (error) {
+                status.textContent = "Status: Could not complete the check. Make sure the Python server is running.";
+            } finally {
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
