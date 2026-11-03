@@ -7,9 +7,13 @@ A local network diagnostics dashboard built with Python, HTML, CSS, and JavaScri
 ## Features
 
 - Sends one ping to 127.0.0.1 per check
-- Displays whether the local machine replies
+- Checks the local machine at 127.0.0.1
+- Checks the configured router at 192.168.1.1
+- Rejects other inputs in JavaScripts and Python
+- Stops a ping check after five seconds
 - Measures total check duration
 - Charts the last 10 check durations
+- Uses cyan bars for replies and orange for no reply or timeout
 - Shows timestamped check history
 - Uses a dark interface with cyan accents
 
@@ -47,7 +51,8 @@ the result and updates the chart and history.
 
 ## Current limitations
 
-- Checks only 127.0.0.1, the machine running the server.
+- Checks only 127.0.0.1 and the configured router, 192.168.1.1
+- A different router address must be configured in both server.py and index.html.
 - A successful loopback check does not verify internet connectivity.
 - Duration measures the complete browser-to-server check,
   including starting ping. It is not the ping round-trip time.
