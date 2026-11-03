@@ -39,7 +39,7 @@ Keep Terminal running and open this address in your browser:
 
 http://127.0.0.1:8000/index.html
 
-Enter 127.0.0.1 and click Run Check.
+Enter 127.0.0.1 to check your MAC, or 192.168.1.1 to check the configured router, then click Run Check.
 
 To stop the server, press Control + C in Terminal.
 
